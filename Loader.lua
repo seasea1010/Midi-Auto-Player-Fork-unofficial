@@ -11,8 +11,8 @@ if getgenv().MidiAutoPlayerLoaded then
 end
 getgenv().MidiAutoPlayerLoaded = true
 
-local RepoOwner = "g4zwr"
-local RepoName  = "Midi-Auto-Player"
+local RepoOwner = "seasea1010"
+local RepoName  = "Midi-Auto-Player-Fork-unofficial"
 local RepoPath  = "midi/"
 local RepoBase  = "https://raw.githubusercontent.com/" .. RepoOwner .. "/" .. RepoName .. "/refs/heads/main/"
 local ApiUrl    = "https://api.github.com/repos/" .. RepoOwner .. "/" .. RepoName .. "/contents/" .. RepoPath:gsub("/$", "")
@@ -586,28 +586,21 @@ local function RunDownloads(queue)
 end
 
 ---------------------------------------------------------
--- MAIN
+-- MAIN (NO MIDI AUTO-DOWNLOAD)
 ---------------------------------------------------------
 
-local songList = FetchSongList()
-print("[MidiPlayer] Found " .. #songList .. " song(s) in repo")
-
-local queue = BuildQueue(songList)
-if #queue > 0 then
-    print("[MidiPlayer] " .. #queue .. " song(s) need downloading, " ..
-          DOWNLOAD_WORKERS .. " at a time")
-    RunDownloads(queue)
-else
-    print("[MidiPlayer] Library already up to date, nothing to download")
-end
+-- Skip repository manifest requests, queue building, and MIDI downloads.
+-- Load only the GUI from this fork; local MIDI files are scanned by pianista.lua.
 
 local guiOk, guiErr = pcall(function()
-    local chunk = loadstring(FetchGui())
+    local guiSource = FetchGui()
+    local chunk = loadstring(guiSource)
     if type(chunk) ~= "function" then
         error("loadstring did not return a function")
     end
     return chunk()
 end)
+
 if not guiOk then
     warn("[MidiPlayer] Failed to start the GUI: " .. tostring(guiErr))
 end
