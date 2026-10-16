@@ -1067,13 +1067,26 @@ local function categorizeFiles()
 end
 
 local function getDirListing(path)
-    if listfiles then
-        local ok, result = pcall(listfiles, path)
-        if ok then return result end
+    local candidates = { path }
+
+    -- Some executors return no entries for an empty root path.
+    if path == "" then
+        table.insert(candidates, "workspace")
     end
-    if listfile then
-        local ok, result = pcall(listfile, path)
-        if ok then return result end
+
+    for _, candidate in ipairs(candidates) do
+        if listfiles then
+            local ok, result = pcall(listfiles, candidate)
+            if ok and type(result) == "table" and (#result > 0 or candidate ~= "") then
+                return result
+            end
+        end
+        if listfile then
+            local ok, result = pcall(listfile, candidate)
+            if ok and type(result) == "table" and (#result > 0 or candidate ~= "") then
+                return result
+            end
+        end
     end
     return nil
 end
@@ -1102,22 +1115,37 @@ local function copyRtxToMid(filePath)
     return nil
 end
 
-local function scanDirectory(path, resultsSet, depth)
+local function scanDirectory(path, resultsSet, depth, visited)
     depth = depth or 0
-    if depth > 6 then return end
+    visited = visited or {}
+    if depth > 12 then return end
+
     local items = getDirListing(path)
-    if not items then return end
+    if type(items) ~= "table" then return end
+
     for _, itemPath in ipairs(items) do
-        local isDir = isfolder and (pcall(isfolder, itemPath) and isfolder(itemPath))
-        if isDir then
-            scanDirectory(itemPath, resultsSet, depth + 1)
-        else
-            local lowerPath = string.lower(itemPath)
-            if string.sub(lowerPath, -4) == ".rtx" or string.sub(lowerPath, -8) == ".mid.rtx" then
-                local newMid = copyRtxToMid(itemPath)
-                if newMid then resultsSet[newMid] = true end
-            elseif string.sub(lowerPath, -4) == ".mid" or string.sub(lowerPath, -5) == ".midi" then
-                resultsSet[itemPath] = true
+        if type(itemPath) == "string" and itemPath ~= "" then
+            local normalized = itemPath:gsub("\\", "/")
+            local lowerPath = normalized:lower()
+
+            local isDir = false
+            if isfolder then
+                local ok, result = pcall(isfolder, itemPath)
+                isDir = ok and result == true
+            end
+
+            if isDir then
+                if not visited[normalized] then
+                    visited[normalized] = true
+                    scanDirectory(itemPath, resultsSet, depth + 1, visited)
+                end
+            else
+                if lowerPath:sub(-8) == ".mid.rtx" or lowerPath:sub(-4) == ".rtx" then
+                    local newMid = copyRtxToMid(itemPath)
+                    if newMid then resultsSet[newMid] = true end
+                elseif lowerPath:sub(-4) == ".mid" or lowerPath:sub(-5) == ".midi" then
+                    resultsSet[itemPath] = true
+                end
             end
         end
     end
